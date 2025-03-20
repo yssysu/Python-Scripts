@@ -1,7 +1,7 @@
 # 学习python的笔记
 
 基本语法的学习和自己写的一些脚本处理一些数据
-
+## py脚本
 - [X] *downloadVideo.py*:用来下载网页视频。
 
 > 仅用来测试了bilibili和YouTobe网站，理论上是yt_dlp库支持的网站都能能够下载视频，默认的下载格式是.mp4，下载的视频和音频的质量默认为最佳。
@@ -38,3 +38,6 @@
 * [X] *osm_to_shp.py:* 批量的将 `osm`文件转化成 `shp`文件，只需要设置输出路径，该脚本即可自动获取窗口目录下所有 `osm`图层。其他格式的文件尚未测试。
 
 > 该脚本需要在QGIS的工作台运行，主要针对的是从OpenStreetMap平台获取到的多个osm数据处理。
+
+## 自动签到脚本（auto_sign/,以.ipynb）为主
+- [X] *自动签到_果粉ios.ipynb*: 基于 `helium` 库进行自动签到，相关内容参考 [helium GitHub 仓库](https://github.com/mherrmann/helium)。该脚本仅用于学习交流，不会用于非法用途。
