@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from collections import Counter
 import traceback
+import chardet
 
 def get_info():
     print("请输入用户名(User):")
@@ -19,25 +20,65 @@ def get_info():
     m = input()
     return User,Passwords,Database,n,m
 
+def detect_encoding(file_path):
+    with open(file_path, 'rb') as f:
+        raw_data = f.read(10000)  # 读取部分数据检测编码
+        result = chardet.detect(raw_data)
+        return result['encoding']
+
 def shp2pgsql(file, engine, success_files, failed_files):
     """单个shp文件入库"""
     file_name = os.path.split(file)[1]
     try:
         print(f"正在写入: {file_name}")
         tbl_name = file_name.split('.')[0]  # 表名
-        map_data = gpd.read_file(file, encoding='utf-8')
+
+        # 尝试不同的编码
+        encodings = ['utf-8', 'gbk', 'gb18030', 'latin1', 'ISO-8859-1']
+        map_data = None
+        
+        for encoding in encodings:
+            try:
+                print(f"尝试使用编码: {encoding}")
+                map_data = gpd.read_file(file, encoding=encoding)
+                print(f"使用编码 {encoding} 成功读取文件")
+                break
+            except UnicodeDecodeError:
+                print(f"编码 {encoding} 失败，尝试下一个编码")
+                continue
+            except Exception as e:
+                print(f"使用编码 {encoding} 读取文件时发生其他错误: {str(e)}")
+                continue
+        
+        if map_data is None:
+            raise Exception("无法使用任何编码读取文件")
+            
         if map_data.empty:
             print(f"警告: 文件 {file_name} 数据为空，跳过此文件。")
             return
+            
         spatial_ref = map_data.crs.to_epsg() or 4326  # 确保获取有效 SRID
         print(f"空间参考系 (SRID): {spatial_ref}")
 
         # 检查是否有空的几何数据
         if map_data['geometry'].isnull().any():
-            print(f"警告: 文件 {file_name} 包含空的几何数据，跳过此文件。")
+            print(f"警告: 文件 {file_name} 包含空的几何数据，将过滤掉空几何数据。")
+            map_data = map_data[map_data['geometry'].notnull()]
+            if map_data.empty:
+                print(f"警告: 过滤后，文件 {file_name} 数据为空，跳过此文件。")
+                return
+        
+        # 处理几何数据
+        map_data['geometry'] = map_data['geometry'].apply(
+            lambda x: WKTElement(x.wkt, spatial_ref) if x and hasattr(x, 'wkt') else None
+        )
+        
+        # 再次过滤掉几何数据为空的行
+        map_data = map_data[map_data['geometry'].notnull()]
+        if map_data.empty:
+            print(f"警告: 处理后，文件 {file_name} 数据为空，跳过此文件。")
             return
         
-        map_data['geometry'] = map_data['geometry'].apply(lambda x: WKTElement(x.wkt, spatial_ref))
         map_data.to_sql(
             name=tbl_name,
             con=engine,
@@ -118,6 +159,6 @@ def shp2pgsql_batch(dir_name, username, password, host, port, dbname):
 
 # 执行任务计划
 if __name__ == '__main__':
-    file_path = r'/Users/yangsai/Downloads/QGIS/数据'
+    file_path = r'D:\\Geodata'
     username, password, dbname, port, host = get_info()
     shp2pgsql_batch(file_path, username, password, host, port, dbname)
